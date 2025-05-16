@@ -11,6 +11,17 @@
         <header>
             <h1>Organization Dashboard</h1>
             <button onclick="logout()">Logout</button>
+           
+    <div>
+        <button class="back-btn" onclick="navigateTo('index.html')">
+            <i class="fas fa-arrow-left"></i> Back
+        </button>
+        <h1>Organization Dashboard</h1>
+    </div>
+    <button class="logout-btn" onclick="logout()">
+        <i class="fas fa-sign-out-alt"></i> Logout
+    </button>
+
         </header>
         
         <div class="dashboard-content">
@@ -36,6 +47,8 @@
             </div>
         </div>
     </div>
+    
+
 
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>

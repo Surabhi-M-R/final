@@ -90,3 +90,53 @@ document.addEventListener('DOMContentLoaded', function() {
         observer.observe(card);
     });
 });
+
+// Navigation functions
+function navigateTo(page) {
+    // Add transition effect
+    document.querySelector('.container')?.classList.add('fade-out');
+    setTimeout(() => {
+        window.location.href = page;
+    }, 300);
+}
+
+function logout() {
+    // Show loading state
+    const logoutBtn = document.querySelector('.logout-btn');
+    if (logoutBtn) {
+        logoutBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging out...';
+        logoutBtn.disabled = true;
+    }
+    
+    auth.signOut().then(() => {
+        // Add success effect before redirect
+        document.body.classList.add('fade-out');
+        setTimeout(() => {
+            window.location.href = 'index.html';
+        }, 500);
+    }).catch((error) => {
+        console.error('Logout error:', error);
+        if (logoutBtn) {
+            logoutBtn.innerHTML = '<i class="fas fa-sign-out-alt"></i> Logout';
+            logoutBtn.disabled = false;
+        }
+        alert('Logout failed. Please try again.');
+    });
+}
+function initDashboard() {
+    const currentPage = window.location.pathname.split('/').pop();
+    
+    if (currentPage === 'org-dashboard.html') {
+        document.getElementById('certificate-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            issueCertificate();
+        });
+        loadIssuedCertificates();
+    } else if (currentPage === 'student-dashboard.html') {
+        loadStudentCertificates();
+        loadStudentNotifications();
+        
+        // Refresh notifications every 30 seconds
+        setInterval(loadStudentNotifications, 30000);
+    }
+}

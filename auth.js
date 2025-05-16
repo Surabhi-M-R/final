@@ -48,8 +48,18 @@ function orgLogin() {
     const password = document.getElementById('org-password-login').value;
     
     auth.signInWithEmailAndPassword(email, password)
-        .then(() => {
-            window.location.href = 'org-dashboard.html';
+        .then((userCredential) => {
+            // Verify this is an organization account
+            const user = userCredential.user;
+            database.ref('organizations/' + user.uid).once('value')
+                .then((snapshot) => {
+                    if (snapshot.exists()) {
+                        window.location.href = 'org-dashboard.html';
+                    } else {
+                        document.getElementById('org-auth-message').textContent = "This is not an organization account.";
+                        auth.signOut();
+                    }
+                });
         })
         .catch((error) => {
             document.getElementById('org-auth-message').textContent = error.message;
@@ -136,5 +146,36 @@ function checkAuthState() {
 
 // Initialize auth check
 checkAuthState();
-
+function checkAuthState() {
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            const currentPage = window.location.pathname.split('/').pop();
+            
+            // If on index page, redirect to appropriate dashboard
+            if (currentPage === 'index.html' || currentPage === '') {
+                database.ref('organizations/' + user.uid).once('value')
+                    .then((snapshot) => {
+                        if (snapshot.exists()) {
+                            window.location.href = 'org-dashboard.html';
+                        } else {
+                            database.ref('students/' + user.uid).once('value')
+                                .then((studentSnapshot) => {
+                                    if (studentSnapshot.exists()) {
+                                        window.location.href = 'student-dashboard.html';
+                                    }
+                                });
+                        }
+                    });
+            }
+        } else {
+            // If not logged in and trying to access dashboard, redirect to home
+            const currentPage = window.location.pathname.split('/').pop();
+            if (currentPage === 'org-dashboard.html' || 
+                currentPage === 'student-dashboard.html' ||
+                currentPage === 'employee.html') {
+                window.location.href = 'index.html';
+            }
+        }
+    });
+}
 

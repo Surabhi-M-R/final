@@ -46,28 +46,39 @@ function issueCertificate() {
         return;
     }
     
-    // Upload image to Firebase Storage (if you set it up)
-    // For simplicity, we'll just store the image name
-    const imageName = certificateImage.name;
+    // Upload image to Firebase Storage
+    const storageRef = firebase.storage().ref();
+    const imageRef = storageRef.child(certificates/${certificateHash}_${certificateImage.name});
     
-    // Create certificate data
-    const certificateData = {
-        issuerId: user.uid,
-        issuerName: issuerName,
-        studentName: studentName,
-        studentEmail: studentEmail,
-        issueDate: issueDate,
-        imageName: imageName,
-        hash: certificateHash,
-        timestamp: firebase.database.ServerValue.TIMESTAMP
-    };
-    
-    // Save to database
-    const newCertRef = database.ref('certificates').push();
-    newCertRef.set(certificateData)
-        .then(() => {
-            // Create notification for student
-            createNotification(studentEmail, studentName, issuerName, newCertRef.key);
+    imageRef.put(certificateImage)
+        .then((snapshot) => snapshot.ref.getDownloadURL())
+        .then((downloadURL) => {
+            // Create certificate data
+            const certificateData = {
+                issuerId: user.uid,
+                issuerName: issuerName,
+                studentName: studentName,
+                studentEmail: studentEmail,
+                issueDate: issueDate,
+                imageUrl: downloadURL,
+                hash: certificateHash,
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            // Save to database
+            const newCertRef = database.ref('certificates').push();
+            return newCertRef.set(certificateData)
+                .then(() => {
+                    // Return both the certificate ID and data for notification
+                    return { 
+                        certificateId: newCertRef.key, 
+                        certificateData: certificateData 
+                    };
+                });
+        })
+        .then(({ certificateId, certificateData }) => {
+            // Create detailed notification for student dashboard
+            createDashboardNotification(studentEmail, certificateId, certificateData);
             
             // Reset form
             document.getElementById('certificate-form').reset();
@@ -84,7 +95,7 @@ function issueCertificate() {
         });
 }
 
-function createNotification(studentEmail, studentName, issuerName, certificateId) {
+function createDashboardNotification(studentEmail, certificateId, certificateData) {
     // Find student by email
     database.ref('students').orderByChild('email').equalTo(studentEmail).once('value')
         .then((snapshot) => {
@@ -92,15 +103,23 @@ function createNotification(studentEmail, studentName, issuerName, certificateId
                 snapshot.forEach((childSnapshot) => {
                     const studentId = childSnapshot.key;
                     
-                    // Create notification
+                    // Create comprehensive notification
                     const notificationData = {
+                        type: 'new_certificate',
                         studentId: studentId,
-                        studentName: studentName,
-                        issuerName: issuerName,
+                        studentName: certificateData.studentName,
+                        issuerName: certificateData.issuerName,
                         certificateId: certificateId,
-                        message: `You have received a new certificate from ${issuerName}`,
+                        certificateHash: certificateData.hash,
+                        issueDate: certificateData.issueDate,
+                        imageUrl: certificateData.imageUrl,
+                        message: New certificate from ${certificateData.issuerName},
                         timestamp: firebase.database.ServerValue.TIMESTAMP,
-                        read: false
+                        read: false,
+                        metadata: {
+                            issuerId: certificateData.issuerId,
+                            verificationLink: https://your-app-url.com/verify.html?cert=${certificateId}&hash=${certificateData.hash}
+                        }
                     };
                     
                     database.ref('notifications').push(notificationData);
@@ -108,45 +127,12 @@ function createNotification(studentEmail, studentName, issuerName, certificateId
             }
         });
 }
-
-// Student Dashboard Functions
-function loadStudentCertificates() {
-    const user = firebase.auth().currentUser;
-    if (!user) return;
-    
-    const certificatesList = document.getElementById('certificates-list');
-    certificatesList.innerHTML = '<p>Loading certificates...</p>';
-    
-    database.ref('certificates').orderByChild('studentEmail').equalTo(user.email).once('value')
-        .then((snapshot) => {
-            certificatesList.innerHTML = '';
-            
-            if (!snapshot.exists()) {
-                certificatesList.innerHTML = '<p>No certificates found.</p>';
-                return;
-            }
-            
-            snapshot.forEach((childSnapshot) => {
-                const cert = childSnapshot.val();
-                const certItem = document.createElement('div');
-                certItem.className = 'certificate-item';
-                certItem.innerHTML = `
-                    <h3>${cert.issuerName}</h3>
-                    <p>Issued on: ${cert.issueDate}</p>
-                    <p>Certificate ID: ${cert.hash}</p>
-                    <button class="download-btn" onclick="downloadCertificate('${childSnapshot.key}')">Download</button>
-                `;
-                certificatesList.appendChild(certItem);
-            });
-        });
-}
-
 function loadStudentNotifications() {
     const user = firebase.auth().currentUser;
     if (!user) return;
     
     const notificationsList = document.getElementById('notifications-list');
-    notificationsList.innerHTML = '<p>Loading notifications...</p>';
+    notificationsList.innerHTML = '<p class="loading">Loading notifications...</p>';
     
     // First get student ID from students node
     database.ref('students').orderByChild('email').equalTo(user.email).once('value')
@@ -155,25 +141,35 @@ function loadStudentNotifications() {
                 studentSnapshot.forEach((childSnapshot) => {
                     const studentId = childSnapshot.key;
                     
-                    // Now get notifications for this student
-                    database.ref('notifications').orderByChild('studentId').equalTo(studentId).once('value')
+                    // Get notifications for this student, newest first
+                    database.ref('notifications')
+                        .orderByChild('studentId')
+                        .equalTo(studentId)
+                        .once('value')
                         .then((notificationSnapshot) => {
                             notificationsList.innerHTML = '';
                             
                             if (!notificationSnapshot.exists()) {
-                                notificationsList.innerHTML = '<p>No notifications.</p>';
+                                notificationsList.innerHTML = '<p class="no-notifications">No notifications yet.</p>';
                                 return;
                             }
                             
-                            notificationSnapshot.forEach((notifChildSnapshot) => {
-                                const notif = notifChildSnapshot.val();
-                                const notifItem = document.createElement('div');
-                                notifItem.className = 'notification-item';
-                                notifItem.innerHTML = `
-                                    <h3>${notif.message}</h3>
-                                    <p>${new Date(notif.timestamp).toLocaleString()}</p>
-                                `;
-                                notificationsList.appendChild(notifItem);
+                            // Convert to array and sort by timestamp
+                            const notifications = [];
+                            notificationSnapshot.forEach(notifChild => {
+                                notifications.push({
+                                    id: notifChild.key,
+                                    ...notifChild.val()
+                                });
+                            });
+                            
+                            // Sort by timestamp (newest first)
+                            notifications.sort((a, b) => b.timestamp - a.timestamp);
+                            
+                            // Display notifications
+                            notifications.forEach(notif => {
+                                const notifElement = createNotificationElement(notif);
+                                notificationsList.appendChild(notifElement);
                             });
                         });
                 });
@@ -181,13 +177,67 @@ function loadStudentNotifications() {
         });
 }
 
-function downloadCertificate(certificateId) {
-    // In a real app, you would generate or retrieve the actual certificate file
-    // For this example, we'll just show an alert
-    alert(`Downloading certificate with ID: ${certificateId}`);
+function createNotificationElement(notification) {
+    const notifElement = document.createElement('div');
+    notifElement.className = notification-item ${notification.read ? 'read' : 'unread'};
+    notifElement.dataset.notificationId = notification.id;
     
-    // You would typically:
-    // 1. Get certificate data from database
-    // 2. Generate PDF or retrieve stored file
-    // 3. Provide download link to user
+    let notificationHTML = `
+        <div class="notification-header">
+            <h3>${notification.message}</h3>
+            <span class="notification-time">${formatTime(notification.timestamp)}</span>
+        </div>
+    `;
+    
+    // Special handling for certificate notifications
+    if (notification.type === 'new_certificate') {
+        notificationHTML += `
+            <div class="certificate-notification-details">
+                <p><strong>Issuer:</strong> ${notification.issuerName}</p>
+                <p><strong>Issued on:</strong> ${notification.issueDate}</p>
+                <div class="certificate-ids">
+                    <p><strong>Certificate ID:</strong> <span class="monospace">${notification.certificateId}</span></p>
+                    <p><strong>Verification Hash:</strong> <span class="monospace">${notification.certificateHash}</span></p>
+                </div>
+                <div class="notification-actions">
+                    <button class="view-certificate-btn" 
+                            onclick="viewCertificate('${notification.certificateId}')">
+                        <i class="fas fa-certificate"></i> View Certificate
+                    </button>
+                    <button class="verify-certificate-btn" 
+                            onclick="verifyCertificate('${notification.certificateId}', '${notification.certificateHash}')">
+                        <i class="fas fa-shield-alt"></i> Verify
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    notifElement.innerHTML = notificationHTML;
+    
+    // Mark as read when clicked
+    notifElement.addEventListener('click', function() {
+        if (!notification.read) {
+            database.ref(notifications/${notification.id}/read).set(true);
+            notifElement.classList.add('read');
+            notifElement.classList.remove('unread');
+        }
+    });
+    
+    return notifElement;
+}
+
+function formatTime(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+}
+
+function viewCertificate(certificateId) {
+    // Implement certificate viewing logic
+    window.location.href = view-certificate.html?id=${certificateId};
+}
+
+function verifyCertificate(certificateId, hash) {
+    // Implement verification logic
+    window.open(verify.html?cert=${certificateId}&hash=${hash}, '_blank');
 }
