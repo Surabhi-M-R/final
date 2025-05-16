@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Organization Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header>
+            <h1>Organization Dashboard</h1>
+            <button onclick="logout()">Logout</button>
+        </header>
+        
+        <div class="dashboard-content">
+            <div class="dashboard-card">
+                <h2>Issue Certificate</h2>
+                <form id="certificate-form">
+                    <input type="text" id="issuer-name" placeholder="Issuer Name" required>
+                    <input type="text" id="student-name" placeholder="Student Name" required>
+                    <input type="email" id="student-email" placeholder="Student Email" required>
+                    <input type="date" id="issue-date" required>
+                    <input type="file" id="certificate-image" accept="image/*" required>
+                    <button type="button" onclick="generateHash()">Generate Hash</button>
+                    <input type="text" id="certificate-hash" placeholder="Certificate Hash" readonly>
+                    <button type="submit">Issue Certificate</button>
+                </form>
+            </div>
+            
+            <div class="dashboard-card">
+                <h2>Issued Certificates</h2>
+                <div id="issued-certificates-list">
+                    <!-- Certificates will be listed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <script src="auth.js"></script>
+    <script src="database.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Portal</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-form">
+            <h1>Student Portal</h1>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab('login')">Login</button>
+                <button class="tab-btn" onclick="openTab('signup')">Sign Up</button>
+            </div>
+            
+            <div id="login" class="tab-content active">
+                <input type="email" id="student-email-login" placeholder="Email" required>
+                <input type="password" id="student-password-login" placeholder="Password" required>
+                <button onclick="studentLogin()">Login</button>
+            </div>
+            
+            <div id="signup" class="tab-content">
+                <input type="text" id="student-name" placeholder="Full Name" required>
+                <input type="email" id="student-email" placeholder="Email" required>
+                <input type="password" id="student-password" placeholder="Password" required>
+                <input type="password" id="student-confirm-password" placeholder="Confirm Password" required>
+                <button onclick="studentSignup()">Sign Up</button>
+            </div>
+            
+            <p id="student-auth-message"></p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <script src="auth.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
