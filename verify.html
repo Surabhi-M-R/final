@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Certificate</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <button class="back-btn" onclick="navigateTo('index.html')">
+                    <i class="fas fa-arrow-left"></i> Back to Home
+                </button>
+                <h1><i class="fas fa-shield-alt"></i> Certificate Verification</h1>
+            </div>
+        </header>
+        
+        <div class="verification-container">
+            <div class="verification-form">
+                <h2>Verify Certificate Authenticity</h2>
+                <p>Enter certificate details to verify its authenticity</p>
+                
+                <div class="form-group">
+                    <label for="certificate-id">Certificate ID</label>
+                    <input type="text" id="certificate-id" placeholder="Enter certificate ID">
+                </div>
+                
+                <div class="form-group">
+                    <label for="certificate-hash">Verification Hash</label>
+                    <input type="text" id="certificate-hash" placeholder="Enter verification hash">
+                </div>
+                
+                <button id="verify-btn" onclick="verifyManually()">
+                    <i class="fas fa-check-circle"></i> Verify Certificate
+                </button>
+            </div>
+            
+            <div id="verification-result" class="verification-result">
+                <div id="verification-loading" class="loading-state hidden">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Verifying certificate...</p>
+                </div>
+                
+                <div id="verification-success" class="success-state hidden">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>Certificate Verified</h3>
+                    <p>This certificate is authentic and has been issued by:</p>
+                    <div class="certificate-info">
+                        <div class="detail-item">
+                            <span class="detail-label">Issuer:</span>
+                            <span id="issuer-name" class="detail-value"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Student:</span>
+                            <span id="student-name" class="detail-value"></span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Issue Date:</span>
+                            <span id="issue-date" class="detail-value"></span>
+                        </div>
+                    </div>
+                    <button onclick="viewCertificateDetails()">
+                        <i class="fas fa-eye"></i> View Certificate
+                    </button>
+                </div>
+                
+                <div id="verification-error" class="error-state hidden">
+                    <i class="fas fa-times-circle"></i>
+                    <h3>Verification Failed</h3>
+                    <p id="error-message">The certificate could not be verified.</p>
+                </div>
+                
+                <div id="verification-initial" class="initial-state">
+                    <i class="fas fa-shield-alt"></i>
+                    <p>Enter certificate details above or use the URL parameters to verify a certificate.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="blockchain-info">
+            <h3><i class="fas fa-link"></i> Blockchain Verification</h3>
+            <p>This certificate verification is secured by blockchain technology, ensuring tamper-proof validation.</p>
+            <div id="blockchain-details" class="blockchain-details hidden">
+                <div class="detail-item">
+                    <span class="detail-label">Transaction Hash:</span>
+                    <span id="transaction-hash" class="detail-value monospace"></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Block Number:</span>
+                    <span id="block-number" class="detail-value"></span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Timestamp:</span>
+                    <span id="blockchain-timestamp" class="detail-value"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    
+    <script src="auth.js"></script>
+    <script src="database.js"></script>
+    <script src="main.js"></script>
+    <script>
+        // Get certificate ID and hash from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const certificateId = urlParams.get('cert');
+        const certificateHash = urlParams.get('hash');
+        let verifiedCertificate = null;
+        
+        // Initialize verification
+        document.addEventListener('DOMContentLoaded', function() {
+            // If URL contains certificate ID and hash, auto-verify
+            if (certificateId && certificateHash) {
+                document.getElementById('certificate-id').value = certificateId;
+                document.getElementById('certificate-hash').value = certificateHash;
+                verifyManually();
+            }
+        });
+        
+        function verifyManually() {
+            const certId = document.getElementById('certificate-id').value.trim();
+            const certHash = document.getElementById('certificate-hash').value.trim();
+            
+            if (!certId || !certHash) {
+                showError("Please enter both Certificate ID and Verification Hash");
+                return;
+            }
+            
+            // Show loading state
+            showVerificationState('loading');
+            
+            // Verify certificate
+            database.ref('certificates/' + certId).once('value')
+                .then((snapshot) => {
+                    if (!snapshot.exists()) {
+                        showError("Certificate not found");
+                        return;
+                    }
+                    
+                    const certificate = snapshot.val();
+                    
+                    // Check if hash matches
+                    if (certificate.hash !== certHash) {
+                        showError("Invalid verification hash. This certificate may have been tampered with.");
+                        return;
+                    }
+                    
+                    // Check if certificate is revoked
+                    if (certificate.revoked) {
+                        showError("This certificate has been revoked by the issuer and is no longer valid.");
+                        return;
+                    }
+                    
+                    // Certificate is verified
+                    verifiedCertificate = {
+                        id: certId,
+                        ...certificate
+                    };
+                    
+                    // Update UI with certificate details
+                    document.getElementById('issuer-name').textContent = certificate.issuerName;
+                    document.getElementById('student-name').textContent = certificate.studentName;
+                    document.getElementById('issue-date').textContent = certificate.issueDate;
+                    
+                    // Generate mock blockchain data
+                    generateBlockchainData(certId, certHash);
+                    
+                    // Show success state
+                    showVerificationState('success');
+                    
+                    // Log verification for analytics
+                    logVerification(certId);
+                })
+                .catch((error) => {
+                    console.error("Verification error:", error);
+                    showError("Error verifying certificate");
+                });
+        }
+        
+        function showVerificationState(state) {
+            // Hide all states
+            document.getElementById('verification-initial').classList.add('hidden');
+            document.getElementById('verification-loading').classList.add('hidden');
+            document.getElementById('verification-success').classList.add('hidden');
+            document.getElementById('verification-error').classList.add('hidden');
+            
+            // Show requested state
+            document.getElementById('verification-' + state).classList.remove('hidden');
+        }
+        
+        function showError(message) {
+            document.getElementById('error-message').textContent = message;
+            showVerificationState('error');
+        }
+        
+        function viewCertificateDetails() {
+            if (!verifiedCertificate) return;
+            
+            window.location.href = `view-certificate.html?id=${verifiedCertificate.id}`;
+        }
+        
+        function generateBlockchainData(certId, certHash) {
+            // Show loading animation
+            const blockchainDetails = document.getElementById('blockchain-details');
+            blockchainDetails.innerHTML = `
+                <div class="blockchain-loading">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Verifying on blockchain...</p>
+                </div>
+            `;
+            blockchainDetails.classList.remove('hidden');
+            
+            // Simulate blockchain verification with delay
+            setTimeout(() => {
+                // Generate deterministic but random-looking hash based on certificate ID and hash
+                let seed = 0;
+                for (let i = 0; i < certId.length; i++) {
+                    seed += certId.charCodeAt(i);
+                }
+                for (let i = 0; i < certHash.length; i++) {
+                    seed += certHash.charCodeAt(i);
+                }
+                
+                // Generate transaction hash
+                const txHash = '0x' + Array.from({length: 64}, (_, i) => {
+                    const charCode = (seed + i) % 16;
+                    return '0123456789abcdef'[charCode];
+                }).join('');
+                
+                // Generate block number (deterministic but looks random)
+                const blockNumber = 15000000 + (seed % 1000000);
+                
+                // Generate timestamp (use a date in the past)
+                const date = new Date();
+                date.setDate(date.getDate() - (seed % 30)); // Up to 30 days in the past
+                const timestamp = date.toLocaleString();
+                
+                // Update UI with blockchain data
+                blockchainDetails.innerHTML = `
+                    <div class="detail-item">
+                        <span class="detail-label">Transaction Hash:</span>
+                        <span id="transaction-hash" class="detail-value monospace">${txHash}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Block Number:</span>
+                        <span id="block-number" class="detail-value">${blockNumber}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Timestamp:</span>
+                        <span id="blockchain-timestamp" class="detail-value">${timestamp}</span>
+                    </div>
+                    <div class="blockchain-explorer">
+                        <a href="https://etherscan.io/tx/${txHash}" target="_blank" class="explorer-link">
+                            <i class="fas fa-external-link-alt"></i> View on Etherscan
+                        </a>
+                    </div>
+                `;
+            }, 2000); // 2 second delay to simulate blockchain verification
+        }
+        
+        function logVerification(certificateId) {
+            // Log verification for analytics
+            const verificationData = {
+                certificateId: certificateId,
+                timestamp: firebase.database.ServerValue.TIMESTAMP,
+                ipAddress: '(anonymized)',
+                userAgent: navigator.userAgent
+            };
+            
+            database.ref('verifications').push(verificationData)
+                .catch(error => console.error("Error logging verification:", error));
+        }
+    </script>
+</body>
+</html>

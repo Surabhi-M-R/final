@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Portal</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-form">
+            <h1><i class="fas fa-id-card"></i> Employee Portal</h1>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab('login')">Login</button>
+                <button class="tab-btn" onclick="openTab('signup')">Sign Up</button>
+            </div>
+            
+            <div id="login" class="tab-content active">
+                <input type="email" id="employee-email-login" placeholder="Email" required>
+                <input type="password" id="employee-password-login" placeholder="Password" required>
+                <button onclick="employeeLogin()">Login</button>
+            </div>
+            
+            <div id="signup" class="tab-content">
+                <input type="text" id="employee-name" placeholder="Full Name" required>
+                <input type="email" id="employee-email" placeholder="Email" required>
+                <input type="password" id="employee-password" placeholder="Password" required>
+                <input type="password" id="employee-confirm-password" placeholder="Confirm Password" required>
+                <button onclick="employeeSignup()">Sign Up</button>
+            </div>
+            
+            <p id="employee-auth-message"></p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    
+    <!-- Initialize Firebase and Authentication Functions -->
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBymvT0jI1SJoPy1xOWxiiKGV3OxnnCn2o",
+            authDomain: "edu-chain-2e94c.firebaseapp.com",
+            databaseURL: "https://edu-chain-2e94c-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "edu-chain-2e94c",
+            storageBucket: "edu-chain-2e94c.firebasestorage.app",
+            messagingSenderId: "694860359043",
+            appId: "1:694860359043:android:b339ed654690fff69e42b6"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const database = firebase.database();
+        
+        // Tab functionality
+        function openTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.getElementsByClassName('tab-content');
+            for (let i = 0; i < tabContents.length; i++) {
+                tabContents[i].classList.remove('active');
+            }
+            
+            // Remove active class from all tab buttons
+            const tabButtons = document.getElementsByClassName('tab-btn');
+            for (let i = 0; i < tabButtons.length; i++) {
+                tabButtons[i].classList.remove('active');
+            }
+            
+            // Show the selected tab content and mark its button as active
+            document.getElementById(tabName).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+        
+        // Employee Authentication Functions
+        function employeeLogin() {
+            const email = document.getElementById('employee-email-login').value;
+            const password = document.getElementById('employee-password-login').value;
+            
+            if (!email || !password) {
+                document.getElementById('employee-auth-message').textContent = "Please fill in all fields";
+                return;
+            }
+            
+            // Show loading state
+            const loginButton = document.querySelector('#login button');
+            loginButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Logging in...';
+            loginButton.disabled = true;
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    // Verify this is an employee account
+                    const user = userCredential.user;
+                    database.ref('employees/' + user.uid).once('value')
+                        .then((snapshot) => {
+                            if (snapshot.exists()) {
+                                window.location.href = 'employee-dashboard.html';
+                            } else {
+                                document.getElementById('employee-auth-message').textContent = "This is not an employee account.";
+                                auth.signOut();
+                                
+                                // Reset button
+                                loginButton.innerHTML = 'Login';
+                                loginButton.disabled = false;
+                            }
+                        });
+                })
+                .catch((error) => {
+                    document.getElementById('employee-auth-message').textContent = error.message;
+                    
+                    // Reset button
+                    loginButton.innerHTML = 'Login';
+                    loginButton.disabled = false;
+                });
+        }
+
+        function employeeSignup() {
+            const employeeName = document.getElementById('employee-name').value;
+            const email = document.getElementById('employee-email').value;
+            const password = document.getElementById('employee-password').value;
+            const confirmPassword = document.getElementById('employee-confirm-password').value;
+            
+            if (!employeeName || !email || !password || !confirmPassword) {
+                document.getElementById('employee-auth-message').textContent = "Please fill in all fields";
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                document.getElementById('employee-auth-message').textContent = "Passwords don't match!";
+                return;
+            }
+            
+            // Show loading state
+            const signupButton = document.querySelector('#signup button');
+            signupButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing up...';
+            signupButton.disabled = true;
+            
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+                    
+                    // Save additional employee info to database
+                    database.ref('employees/' + user.uid).set({
+                        name: employeeName,
+                        email: email,
+                        role: 'verifier',
+                        createdAt: firebase.database.ServerValue.TIMESTAMP
+                    }).then(() => {
+                        window.location.href = 'employee-dashboard.html';
+                    });
+                })
+                .catch((error) => {
+                    document.getElementById('employee-auth-message').textContent = error.message;
+                    
+                    // Reset button
+                    signupButton.innerHTML = 'Sign Up';
+                    signupButton.disabled = false;
+                });
+        }
+        
+        // Check auth state
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                // Check if this is an employee account
+                database.ref('employees/' + user.uid).once('value')
+                    .then((snapshot) => {
+                        if (snapshot.exists()) {
+                            window.location.href = 'employee-dashboard.html';
+                        }
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

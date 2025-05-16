@@ -1,10 +1,10 @@
 // Firebase configuration (replace with your config)
 const firebaseConfig = {
     apiKey: "AIzaSyBymvT0jI1SJoPy1xOWxiiKGV3OxnnCn2o",
-    authDomain: "http://edu-chain-2e94c.web.app",
+    authDomain: "edu-chain-2e94c.firebaseapp.com",
     databaseURL: "https://edu-chain-2e94c-default-rtdb.asia-southeast1.firebasedatabase.app",
     projectId: "edu-chain-2e94c",
-    storage_bucket: "edu-chain-2e94c.firebasestorage.app",
+    storageBucket: "edu-chain-2e94c.firebasestorage.app",
     messagingSenderId: "694860359043",
     appId: "1:694860359043:android:b339ed654690fff69e42b6"
 };
@@ -118,50 +118,30 @@ function logout() {
 }
 
 // Check auth state and redirect
-function checkAuthState() {
-    auth.onAuthStateChanged((user) => {
-        if (user) {
-            const currentPage = window.location.pathname.split('/').pop();
-            
-            if (currentPage === 'index.html' || currentPage === '') {
-                // Check if user is org or student
-                database.ref('organizations/' + user.uid).once('value')
-                    .then((snapshot) => {
-                        if (snapshot.exists()) {
-                            window.location.href = 'org-dashboard.html';
-                        } else {
-                            window.location.href = 'student-dashboard.html';
-                        }
-                    });
-            }
-        } else {
-            // If not logged in and trying to access dashboard, redirect to home
-            const currentPage = window.location.pathname.split('/').pop();
-            if (currentPage === 'org-dashboard.html' || currentPage === 'student-dashboard.html') {
-                window.location.href = 'index.html';
-            }
-        }
-    });
-}
-
 // Initialize auth check
-checkAuthState();
 function checkAuthState() {
     auth.onAuthStateChanged((user) => {
         if (user) {
             const currentPage = window.location.pathname.split('/').pop();
             
-            // If on index page, redirect to appropriate dashboard
             if (currentPage === 'index.html' || currentPage === '') {
+                // Check user type and redirect appropriately
                 database.ref('organizations/' + user.uid).once('value')
-                    .then((snapshot) => {
-                        if (snapshot.exists()) {
+                    .then((orgSnapshot) => {
+                        if (orgSnapshot.exists()) {
                             window.location.href = 'org-dashboard.html';
                         } else {
-                            database.ref('students/' + user.uid).once('value')
-                                .then((studentSnapshot) => {
-                                    if (studentSnapshot.exists()) {
-                                        window.location.href = 'student-dashboard.html';
+                            database.ref('employees/' + user.uid).once('value')
+                                .then((empSnapshot) => {
+                                    if (empSnapshot.exists()) {
+                                        window.location.href = 'employee-dashboard.html';
+                                    } else {
+                                        database.ref('students/' + user.uid).once('value')
+                                            .then((studentSnapshot) => {
+                                                if (studentSnapshot.exists()) {
+                                                    window.location.href = 'student-dashboard.html';
+                                                }
+                                            });
                                     }
                                 });
                         }
@@ -172,6 +152,7 @@ function checkAuthState() {
             const currentPage = window.location.pathname.split('/').pop();
             if (currentPage === 'org-dashboard.html' || 
                 currentPage === 'student-dashboard.html' ||
+                currentPage === 'employee-dashboard.html' ||
                 currentPage === 'employee.html') {
                 window.location.href = 'index.html';
             }
@@ -179,3 +160,48 @@ function checkAuthState() {
     });
 }
 
+// Initialize auth check
+checkAuthState();
+// Employee Authentication
+function employeeSignup() {
+    const employeeName = document.getElementById('employee-name').value;
+    const email = document.getElementById('employee-email').value;
+    const password = document.getElementById('employee-password').value;
+    const confirmPassword = document.getElementById('employee-confirm-password').value;
+    
+    if (password !== confirmPassword) {
+        document.getElementById('employee-auth-message').textContent = "Passwords don't match!";
+        return;
+    }
+    
+    auth.createUserWithEmailAndPassword(email, password)
+        .then((userCredential) => {
+            const user = userCredential.user;
+            
+            // Save additional employee info to database
+            database.ref('employees/' + user.uid).set({
+                name: employeeName,
+                email: email
+            }).then(() => {
+                window.location.href = 'employee-dashboard.html';
+            });
+        })
+        .catch((error) => {
+            document.getElementById('employee-auth-message').textContent = error.message;
+        });
+}
+
+function employeeLogin() {
+    const email = document.getElementById('employee-email-login').value;
+    const password = document.getElementById('employee-password-login').value;
+    
+    auth.signInWithEmailAndPassword(email, password)
+        .then(() => {
+            window.location.href = 'employee-dashboard.html';
+        })
+        .catch((error) => {
+            document.getElementById('employee-auth-message').textContent = error.message;
+        });
+}
+
+// Employee Authentication functions are defined above

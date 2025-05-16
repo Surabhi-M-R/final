@@ -5,34 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Organization Dashboard</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="dashboard-container">
         <header>
-            <h1>Organization Dashboard</h1>
-            <button onclick="logout()">Logout</button>
-           
-    <div>
-        <button class="back-btn" onclick="navigateTo('index.html')">
-            <i class="fas fa-arrow-left"></i> Back
-        </button>
-        <h1>Organization Dashboard</h1>
-    </div>
-    <button class="logout-btn" onclick="logout()">
-        <i class="fas fa-sign-out-alt"></i> Logout
-    </button>
-
+            <div>
+                <button class="back-btn" onclick="navigateTo('index.html')">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <h1><i class="fas fa-building"></i> Organization Dashboard</h1>
+            </div>
+            <button class="logout-btn" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </button>
         </header>
         
         <div class="dashboard-content">
             <div class="dashboard-card">
-                <h2>Issue Certificate</h2>
+                <h2><i class="fas fa-certificate"></i> Issue Certificate</h2>
                 <form id="certificate-form">
+                    <div class="template-section">
+                        <h3><i class="fas fa-palette"></i> Certificate Templates</h3>
+                        <p>Choose a template for your certificate:</p>
+                        <div class="template-options">
+                            <div class="template-option active" data-template="classic">
+                                <img src="https://via.placeholder.com/100x70?text=Classic" alt="Classic template">
+                                <span>Classic</span>
+                            </div>
+                            <div class="template-option" data-template="modern">
+                                <img src="https://via.placeholder.com/100x70?text=Modern" alt="Modern template">
+                                <span>Modern</span>
+                            </div>
+                            <div class="template-option" data-template="professional">
+                                <img src="https://via.placeholder.com/100x70?text=Pro" alt="Professional template">
+                                <span>Professional</span>
+                            </div>
+                        </div>
+                        <input type="hidden" id="certificate-template" value="classic">
+                    </div>
+                    
                     <input type="text" id="issuer-name" placeholder="Issuer Name" required>
                     <input type="text" id="student-name" placeholder="Student Name" required>
                     <input type="email" id="student-email" placeholder="Student Email" required>
                     <input type="date" id="issue-date" required>
-                    <input type="file" id="certificate-image" accept="image/*" required>
+                    
+                    <div class="drop-area">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag & drop certificate image here</p>
+                        <p class="small">or</p>
+                        <label for="certificate-image" class="upload-btn">Choose File</label>
+                    </div>
+                    <input type="file" id="certificate-image" accept="image/*" required style="display: none;">
+                    
                     <button type="button" onclick="generateHash()">Generate Hash</button>
                     <input type="text" id="certificate-hash" placeholder="Certificate Hash" readonly>
                     <button type="submit">Issue Certificate</button>
@@ -40,9 +66,33 @@
             </div>
             
             <div class="dashboard-card">
-                <h2>Issued Certificates</h2>
+                <h2><i class="fas fa-history"></i> Issued Certificates</h2>
                 <div id="issued-certificates-list">
                     <!-- Certificates will be listed here -->
+                    <div class="initial-state">
+                        <i class="fas fa-certificate"></i>
+                        <p>Your issued certificates will appear here</p>
+                    </div>
+                    
+                    <!-- Certificate Item Template (will be hidden and used by JavaScript) -->
+                    <template id="certificate-item-template">
+                        <div class="certificate-item">
+                            <h3 class="student-name"></h3>
+                            <p>Issued on: <span class="issue-date"></span></p>
+                            <p>Certificate ID: <span class="certificate-hash monospace"></span></p>
+                            <div class="certificate-actions">
+                                <button class="download-btn">
+                                    <i class="fas fa-download"></i> Download
+                                </button>
+                                <button class="view-btn">
+                                    <i class="fas fa-eye"></i> View
+                                </button>
+                                <button class="revoke-btn">
+                                    <i class="fas fa-ban"></i> Revoke
+                                </button>
+                            </div>
+                        </div>
+                    </template>
                 </div>
             </div>
         </div>
@@ -51,9 +101,10 @@
 
 
     <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
     
     <script src="auth.js"></script>
     <script src="database.js"></script>

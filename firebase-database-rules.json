@@ -1,0 +1,48 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null",
+    "employees": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "organizations": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "students": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "certificates": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$certId": {
+        ".read": true,
+        ".write": "auth != null"
+      }
+    },
+    "verificationHistory": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "notifications": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "revocations": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "restorations": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+}

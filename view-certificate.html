@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Certificate</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <button class="back-btn" onclick="goBack()">
+                    <i class="fas fa-arrow-left"></i> Back
+                </button>
+                <h1><i class="fas fa-certificate"></i> Certificate Details</h1>
+            </div>
+            <div class="header-actions">
+                <button class="download-btn" onclick="downloadCertificate()">
+                    <i class="fas fa-download"></i> Download
+                </button>
+                <button class="verify-btn" onclick="verifyCertificate()">
+                    <i class="fas fa-shield-alt"></i> Verify
+                </button>
+            </div>
+        </header>
+        
+        <div class="certificate-container">
+            <div class="certificate-view">
+                <div id="certificate-loading" class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading certificate...</p>
+                </div>
+                <div id="certificate-image-container" class="hidden">
+                    <img id="certificate-image" src="" alt="Certificate">
+                </div>
+                <div id="certificate-error" class="error-state hidden">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>Certificate not found or access denied.</p>
+                </div>
+            </div>
+            
+            <div class="certificate-details-panel">
+                <h2>Certificate Information</h2>
+                <div id="certificate-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Issuer:</span>
+                        <span id="issuer-name" class="detail-value">Loading...</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Student:</span>
+                        <span id="student-name" class="detail-value">Loading...</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Issue Date:</span>
+                        <span id="issue-date" class="detail-value">Loading...</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Certificate ID:</span>
+                        <span id="certificate-id" class="detail-value monospace">Loading...</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Verification Hash:</span>
+                        <span id="certificate-hash" class="detail-value monospace">Loading...</span>
+                    </div>
+                </div>
+                
+                <div class="share-section">
+                    <h3>Share Certificate</h3>
+                    <div class="share-buttons">
+                        <button onclick="shareCertificate('email')">
+                            <i class="fas fa-envelope"></i> Email
+                        </button>
+                        <button onclick="shareCertificate('linkedin')">
+                            <i class="fab fa-linkedin"></i> LinkedIn
+                        </button>
+                        <button onclick="shareCertificate('twitter')">
+                            <i class="fab fa-twitter"></i> Twitter
+                        </button>
+                        <button onclick="copyShareLink()">
+                            <i class="fas fa-link"></i> Copy Link
+                        </button>
+                    </div>
+                    <div id="share-link-container" class="hidden">
+                        <input type="text" id="share-link" readonly>
+                        <span id="copy-message">Link copied!</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    
+    <script src="auth.js"></script>
+    <script src="database.js"></script>
+    <script src="main.js"></script>
+    <script>
+        // Get certificate ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const certificateId = urlParams.get('id');
+        let certificateData = null;
+        
+        // Load certificate details
+        function loadCertificateDetails() {
+            if (!certificateId) {
+                showError("Certificate ID is missing");
+                return;
+            }
+            
+            database.ref('certificates/' + certificateId).once('value')
+                .then((snapshot) => {
+                    if (!snapshot.exists()) {
+                        showError("Certificate not found");
+                        return;
+                    }
+                    
+                    certificateData = snapshot.val();
+                    
+                    // Update UI with certificate details
+                    document.getElementById('issuer-name').textContent = certificateData.issuerName;
+                    document.getElementById('student-name').textContent = certificateData.studentName;
+                    document.getElementById('issue-date').textContent = certificateData.issueDate;
+                    document.getElementById('certificate-id').textContent = certificateId;
+                    document.getElementById('certificate-hash').textContent = certificateData.hash;
+                    
+                    // Show certificate image
+                    const certificateImage = document.getElementById('certificate-image');
+                    certificateImage.src = certificateData.imageUrl;
+                    certificateImage.onload = function() {
+                        document.getElementById('certificate-loading').classList.add('hidden');
+                        document.getElementById('certificate-image-container').classList.remove('hidden');
+                        
+                        // Check if certificate is revoked
+                        if (certificateData.revoked) {
+                            // Add revoked watermark
+                            const watermark = document.createElement('div');
+                            watermark.className = 'revoked-watermark';
+                            watermark.textContent = 'REVOKED';
+                            document.getElementById('certificate-image-container').appendChild(watermark);
+                            
+                            // Add revoked notice
+                            const revokedNotice = document.createElement('div');
+                            revokedNotice.className = 'revoked-notice';
+                            revokedNotice.innerHTML = `
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <p>This certificate has been revoked by the issuer and is no longer valid.</p>
+                            `;
+                            document.querySelector('.certificate-details-panel').prepend(revokedNotice);
+                        }
+                    };
+                    
+                    // Generate share link
+                    const shareLink = `${window.location.origin}/verify.html?cert=${certificateId}&hash=${certificateData.hash}`;
+                    document.getElementById('share-link').value = shareLink;
+                })
+                .catch((error) => {
+                    console.error("Error loading certificate:", error);
+                    showError("Error loading certificate details");
+                });
+        }
+        
+        function showError(message) {
+            document.getElementById('certificate-loading').classList.add('hidden');
+            document.getElementById('certificate-error').classList.remove('hidden');
+            document.getElementById('certificate-error').querySelector('p').textContent = message;
+        }
+        
+        function goBack() {
+            window.history.back();
+        }
+        
+        function downloadCertificate() {
+            if (!certificateData) return;
+            
+            // Create a temporary link to download the image
+            const link = document.createElement('a');
+            link.href = certificateData.imageUrl;
+            link.download = `Certificate_${certificateData.hash}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        function verifyCertificate() {
+            if (!certificateData) return;
+            
+            window.open(`verify.html?cert=${certificateId}&hash=${certificateData.hash}`, '_blank');
+        }
+        
+        function shareCertificate(platform) {
+            if (!certificateData) return;
+            
+            const shareUrl = `${window.location.origin}/verify.html?cert=${certificateId}&hash=${certificateData.hash}`;
+            const shareText = `Check out my certificate from ${certificateData.issuerName}`;
+            
+            switch (platform) {
+                case 'email':
+                    window.location.href = `mailto:?subject=${encodeURIComponent(shareText)}&body=${encodeURIComponent(shareUrl)}`;
+                    break;
+                case 'linkedin':
+                    window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`, '_blank');
+                    break;
+                case 'twitter':
+                    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`, '_blank');
+                    break;
+            }
+        }
+        
+        function copyShareLink() {
+            const shareLink = document.getElementById('share-link');
+            const copyMessage = document.getElementById('copy-message');
+            
+            document.getElementById('share-link-container').classList.remove('hidden');
+            shareLink.select();
+            document.execCommand('copy');
+            
+            copyMessage.style.opacity = '1';
+            setTimeout(() => {
+                copyMessage.style.opacity = '0';
+            }, 2000);
+        }
+        
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCertificateDetails();
+        });
+    </script>
+</body>
+</html>
